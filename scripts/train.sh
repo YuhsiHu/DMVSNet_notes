@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-datapath="/data2/yexinyi/datasets/MVS/training_data/dtu_training/"
+datapath="/home/yuxihu/data/CasMVSNet/dtu_training"
 
 log_dir="checkpoints/DMVSNet"
 if [ ! -d $log_dir ]; then
     mkdir -p $log_dir
 fi
 
-CUDA_VISIBLE_DEVICES=6,7 python -m torch.distributed.launch --nproc_per_node=2 --master_port=1111 main.py \
+CUDA_VISIBLE_DEVICES=0 python -m torch.distributed.launch --nproc_per_node=1 --master_port=1111 main.py \
         --sync_bn \
         --ndepths 48 32 8 \
         --interval_ratio 4 2 1 \

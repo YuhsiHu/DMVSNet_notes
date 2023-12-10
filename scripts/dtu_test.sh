@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-datapath="/data2/yexinyi/datasets/MVS/preprocessed_inputs/dtu/"
+datapath="/home/yuxihu/data/CasMVSNet/dtu_test/"
 outdir="./outputs_dtu/DMVSNet/"
-resume="./checkpoints/DMVSNet/model.ckpt"
+resume="./checkpoints/DMVSNet/model_000015.ckpt"
 fusibile_exe_path="./fusibile/build/fusibile"
 
 
-CUDA_VISIBLE_DEVICES=7 python main.py \
+CUDA_VISIBLE_DEVICES=0 python main.py \
         --test \
         --ndepths 48 32 8 \
         --interval_ratio 4 2 1 \

@@ -7,14 +7,12 @@ from torch.autograd import Variable
 
 sys.path.append("..")
 
-
 def init_bn(module):
     if module.weight is not None:
         nn.init.ones_(module.weight)
     if module.bias is not None:
         nn.init.zeros_(module.bias)
     return
-
 
 def init_uniform(module, init_method):
     if module.weight is not None:
@@ -38,7 +36,6 @@ class Conv2d(nn.Module):
         Default momentum for batch normalization is set to be 0.01,
 
     """
-
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
                  relu=True, bn=True, bn_momentum=0.1, init_method="xavier", **kwargs):
         super(Conv2d, self).__init__()
@@ -48,11 +45,7 @@ class Conv2d(nn.Module):
         self.kernel_size = kernel_size
         self.stride = stride
         self.bn = nn.BatchNorm2d(out_channels, momentum=bn_momentum) if bn else None
-        # self.bn = nn.GroupNorm(8, out_channels) if bn else None
         self.relu = relu
-
-        # assert init_method in ["kaiming", "xavier"]
-        # self.init_weights(init_method)
 
     def forward(self, x):
         x = self.conv(x)
@@ -82,7 +75,6 @@ class Deconv2d(nn.Module):
            Default momentum for batch normalization is set to be 0.01,
 
        """
-
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
                  relu=True, bn=True, bn_momentum=0.1, init_method="xavier", **kwargs):
         super(Deconv2d, self).__init__()
@@ -93,11 +85,7 @@ class Deconv2d(nn.Module):
         self.conv = nn.ConvTranspose2d(in_channels, out_channels, kernel_size, stride=stride,
                                        bias=(not bn), **kwargs)
         self.bn = nn.BatchNorm2d(out_channels, momentum=bn_momentum) if bn else None
-        # self.bn = nn.GroupNorm(8, out_channels) if bn else None
         self.relu = relu
-
-        # assert init_method in ["kaiming", "xavier"]
-        # self.init_weights(init_method)
 
     def forward(self, x):
         y = self.conv(x)
@@ -130,7 +118,6 @@ class Conv3d(nn.Module):
         Default momentum for batch normalization is set to be 0.01,
 
     """
-
     def __init__(self, in_channels, out_channels, kernel_size=3, stride=1,
                  relu=True, bn=True, bn_momentum=0.1, init_method="xavier", **kwargs):
         super(Conv3d, self).__init__()
@@ -144,9 +131,6 @@ class Conv3d(nn.Module):
         self.bn = nn.BatchNorm3d(out_channels, momentum=bn_momentum) if bn else None
         # self.bn = nn.GroupNorm(8, out_channels) if bn else None
         self.relu = relu
-
-        # assert init_method in ["kaiming", "xavier"]
-        # self.init_weights(init_method)
 
     def forward(self, x):
         x = self.conv(x)
@@ -176,7 +160,6 @@ class Deconv3d(nn.Module):
            Default momentum for batch normalization is set to be 0.01,
 
        """
-
     def __init__(self, in_channels, out_channels, kernel_size=3, stride=1,
                  relu=True, bn=True, bn_momentum=0.1, init_method="xavier", **kwargs):
         super(Deconv3d, self).__init__()
@@ -189,9 +172,6 @@ class Deconv3d(nn.Module):
         self.bn = nn.BatchNorm3d(out_channels, momentum=bn_momentum) if bn else None
         # self.bn = nn.GroupNorm(8, out_channels) if bn else None
         self.relu = relu
-
-        # assert init_method in ["kaiming", "xavier"]
-        # self.init_weights(init_method)
 
     def forward(self, x):
         y = self.conv(x)
@@ -206,7 +186,6 @@ class Deconv3d(nn.Module):
         init_uniform(self.conv, init_method)
         if self.bn is not None:
             init_bn(self.bn)
-
 
 
 def homo_warping(src_fea, src_proj, ref_proj, depth_values):
@@ -242,13 +221,12 @@ def homo_warping(src_fea, src_proj, ref_proj, depth_values):
         proj_xy = torch.stack((proj_x_normalized, proj_y_normalized), dim=3)  # [B, Ndepth, H*W, 2]
         grid = proj_xy
 
-    # warped_src_fea = F.grid_sample(src_fea, grid.view(batch, num_depth * height, width, 2), mode='bilinear',
-    #                                padding_mode='zeros').type(torch.float32)
     warped_src_fea = F.grid_sample(src_fea, grid.view(batch, num_depth * height, width, 2), mode='bilinear',
                                    padding_mode='zeros',align_corners=True).type(torch.float32)
     warped_src_fea = warped_src_fea.view(batch, channels, num_depth, height, width)
 
     return warped_src_fea,grid.view(batch, num_depth,height, width, 2)
+
 
 class DeConv2dFuse(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, relu=True, bn=True,
@@ -260,9 +238,6 @@ class DeConv2dFuse(nn.Module):
 
         self.conv = Conv2d(2 * out_channels, out_channels, kernel_size, stride=1, padding=1,
                            bn=bn, relu=relu, bn_momentum=bn_momentum)
-
-        # assert init_method in ["kaiming", "xavier"]
-        # self.init_weights(init_method)
 
     def forward(self, x_pre, x):
         x = self.deconv(x)
@@ -310,9 +285,6 @@ class FeatureNet(nn.Module):
         self.out_channels.append(base_channels * 2)
         self.out_channels.append(base_channels)
             
-
-
-
     def forward(self, x):
         conv0 = self.conv0(x)
         conv1 = self.conv1(conv0)
@@ -335,26 +307,31 @@ class FeatureNet(nn.Module):
         # outputs["stage3"] = out
         outputs["stage3"],outputs["stage3_c"]= out.split([out.shape[1]//2,out.shape[1]//2],1)
 
-
-
         return outputs
+
 
 class CostRegNet(nn.Module):
     def __init__(self, in_channels, base_channels,stage=0):
         super(CostRegNet, self).__init__()
-        self.cosR_small=CostRegNet_part(in_channels, base_channels,stage=0)
-        self.cosR_huge=CostRegNet_part(in_channels, base_channels,stage=0)
+        self.cosR_small = CostRegNet_part(in_channels, base_channels, stage=0)
+        self.cosR_huge = CostRegNet_part(in_channels, base_channels, stage=0)
+
     def forward(self, x):
-        results=torch.cat((self.cosR_small(x),self.cosR_huge(x)),axis=1)
+        results = torch.cat((self.cosR_small(x), self.cosR_huge(x)), axis=1)
         return results
+
+
 class CostRegNet_refine(nn.Module):
     def __init__(self, in_channels, base_channels,stage=0):
         super(CostRegNet_refine, self).__init__()
-        self.cosR_small=CostRegNet_part_refine(in_channels, base_channels,stage=0)
-        self.cosR_huge=CostRegNet_part_refine(in_channels, base_channels,stage=0)
+        self.cosR_small = CostRegNet_part_refine(in_channels, base_channels, stage=0)
+        self.cosR_huge = CostRegNet_part_refine(in_channels, base_channels, stage=0)
+    
     def forward(self, x):
-        results=torch.cat((self.cosR_small(x),self.cosR_huge(x)),axis=1)
+        results = torch.cat((self.cosR_small(x), self.cosR_huge(x)), axis=1)
         return results
+
+
 class CostRegNet_part(nn.Module):
     def __init__(self, in_channels, base_channels,stage=0):
         super(CostRegNet_part, self).__init__()
@@ -375,27 +352,20 @@ class CostRegNet_part(nn.Module):
 
         self.conv11 = Deconv3d(base_channels * 2, base_channels * 1, stride=2, padding=1, output_padding=1)
 
-        # self.prob = nn.Conv3d(base_channels, 1 if stage==0 else 2, 3, stride=1, padding=1, bias=False)
         self.prob = nn.Conv3d(base_channels, 2, 3, stride=1, padding=1, bias=False)
 
-
-        # for m in self.modules():
-        #     if isinstance(m, nn.Conv2d):
-        #         nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-        #     elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
-        #         nn.init.constant_(m.weight, 1)
-        #         nn.init.constant_(m.bias, 0)
-
     def forward(self, x):
-        conv0 = self.conv0(x)
-        conv2 = self.conv2(self.conv1(conv0))
-        conv4 = self.conv4(self.conv3(conv2))
-        x = self.conv6(self.conv5(conv4))
-        x = conv4 + self.conv7(x)
-        x = conv2 + self.conv9(x)
-        x = conv0 + self.conv11(x)
-        x = self.prob(x)
+        # x shape: B 2 D H W
+        conv0 = self.conv0(x)                 # B 8 D H W
+        conv2 = self.conv2(self.conv1(conv0)) # B 16 D/2 H/2 W/2
+        conv4 = self.conv4(self.conv3(conv2)) # B 32 D/4 H/4 W/4
+        x = self.conv6(self.conv5(conv4))     # B 64 D/8 H/8 W/4
+        x = conv4 + self.conv7(x)             # B 32 D/4 H/4 W/4
+        x = conv2 + self.conv9(x)             # B 16 D/2 H/2 W/2
+        x = conv0 + self.conv11(x)            # B 8 D H W
+        x = self.prob(x)                      # B 2 D H W
         return x
+
 
 class CostRegNet_part_refine(nn.Module):
     def __init__(self, in_channels, base_channels,stage=0):
@@ -408,32 +378,31 @@ class CostRegNet_part_refine(nn.Module):
         self.conv3 = Conv3d(base_channels * 2, base_channels * 4, stride=2, padding=1)
         self.conv4 = Conv3d(base_channels * 4, base_channels * 4, padding=1)
 
-        self.conv5 = Conv2d(base_channels * 4, base_channels * 8,3, stride=2, padding=1)
-        self.conv6 = Conv2d(base_channels * 8, base_channels * 8,3, padding=1)
+        self.conv5 = Conv2d(base_channels * 4, base_channels * 8, 3, stride=2, padding=1)
+        self.conv6 = Conv2d(base_channels * 8, base_channels * 8, 3, padding=1)
 
-        self.conv7 = Deconv2d(base_channels * 8, base_channels * 4,3, stride=2, padding=1, output_padding=1)
+        self.conv7 = Deconv2d(base_channels * 8, base_channels * 4, 3, stride=2, padding=1, output_padding=1)
 
         self.conv9 = Deconv3d(base_channels * 4, base_channels * 2, stride=2, padding=1, output_padding=1)
 
         self.conv11 = Deconv3d(base_channels * 2, base_channels * 1, stride=2, padding=1, output_padding=1)
 
-        # self.prob = nn.Conv3d(base_channels, 1 if stage==0 else 2, 3, stride=1, padding=1, bias=False)
         self.prob = nn.Conv3d(base_channels, 2, 3, stride=1, padding=1, bias=False)
-
-
-        
-
-    def forward(self, x,stage=0):
-        conv0 = self.conv0(x)
-        conv2 = self.conv2(self.conv1(conv0))
-        conv4 = self.conv4(self.conv3(conv2)).squeeze(2)
-        x=self.conv6(self.conv5(conv4))
-        x=conv4+self.conv7(x)
-        x=x.unsqueeze(2)
-        x = conv2 + self.conv9(x)
-        x = conv0 + self.conv11(x)
-        x = self.prob(x)
+ 
+    def forward(self, x, stage=0):
+        # x shape: B 2 4 H W
+        conv0 = self.conv0(x)                            # B 8 4 H W
+        conv2 = self.conv2(self.conv1(conv0))            # B 16 2 H/2 W/2
+        conv4 = self.conv4(self.conv3(conv2)).squeeze(2) # B 32 H/4 W/4
+        x = self.conv6(self.conv5(conv4))                # B 64 H/8 W/8
+        x = conv4 + self.conv7(x)                        # B 32 H/4 W/4
+        x = x.unsqueeze(2)                               # B 32 1 H/4 W/4
+        x = conv2 + self.conv9(x)                        # B 16 2 H/2 W/2
+        x = conv0 + self.conv11(x)                       # B 8 4 H W
+        x = self.prob(x)                                 # B 2 4 H W
         return x
+
+
 class AggWeightNetVolume(nn.Module):
     def __init__(self, in_channels=32,hid_channels=1,out_channels=1,relu=True):
         super(AggWeightNetVolume, self).__init__()
@@ -453,12 +422,10 @@ class AggWeightNetVolume(nn.Module):
 
 def depth_regression(p, depth_values,axis=1):
     if depth_values.dim() <= 2:
-        # print("regression dim <= 2")
         depth_values = depth_values.view(*depth_values.shape, 1, 1)
     depth = torch.sum(p * depth_values, axis=axis)
 
     return depth
-
 
 def winner_take_all(prob_volume, depth_values):
     """
@@ -470,16 +437,11 @@ def winner_take_all(prob_volume, depth_values):
     depth = torch.gather(depth_values, 1, idx).squeeze(1)
     return depth
 
-
-
-
 def get_cur_depth_range_samples_n(last_depth, ndepth, depth_inteval_pixel):
     # cur_depth: (B, H, W)
     # return depth_range_values: (B, D, H, W)
     last_depth_min = (last_depth - (ndepth+2) / 2 * depth_inteval_pixel)  # (B, H, W)
     last_depth_max = (last_depth + (ndepth-2) / 2 * depth_inteval_pixel)
-    # cur_depth_min = (cur_depth - ndepth / 2 * depth_inteval_pixel).clamp(min=0.0)   #(B, H, W)
-    # cur_depth_max = (cur_depth_min + (ndepth - 1) * depth_inteval_pixel).clamp(max=max_depth)
 
     new_interval = (last_depth_max - last_depth_min) / (ndepth - 1)  # (B, H, W)
 
@@ -489,13 +451,12 @@ def get_cur_depth_range_samples_n(last_depth, ndepth, depth_inteval_pixel):
                                                                                                    1) * new_interval.unsqueeze(1))
 
     return depth_range_samples, (ndepth * depth_inteval_pixel) / (ndepth - 1)
+
 def get_cur_depth_range_samples_p(last_depth, ndepth, depth_inteval_pixel):
     # cur_depth: (B, H, W)
     # return depth_range_values: (B, D, H, W)
     last_depth_min = (last_depth - (ndepth-2) / 2 * depth_inteval_pixel)  # (B, H, W)
     last_depth_max = (last_depth + (ndepth+2) / 2 * depth_inteval_pixel)
-    # cur_depth_min = (cur_depth - ndepth / 2 * depth_inteval_pixel).clamp(min=0.0)   #(B, H, W)
-    # cur_depth_max = (cur_depth_min + (ndepth - 1) * depth_inteval_pixel).clamp(max=max_depth)
 
     new_interval = (last_depth_max - last_depth_min) / (ndepth - 1)  # (B, H, W)
 
@@ -537,6 +498,7 @@ def get_cur_depth_range_samples_inverse_p(last_depth, ndepth, depth_inteval_pixe
                 
     depth_range_samples=1/inverse_depth_range_samples
     return depth_range_samples, (ndepth * depth_inteval_pixel) / (ndepth - 1)
+
 def get_cur_depth_range_samples_inverse_n(last_depth, ndepth, depth_inteval_pixel):
     # cur_depth: (B, H, W)
     # return depth_range_values: (B, D, H, W)
@@ -553,7 +515,7 @@ def get_cur_depth_range_samples_inverse_n(last_depth, ndepth, depth_inteval_pixe
     depth_range_samples=1/inverse_depth_range_samples
     return depth_range_samples, (ndepth * depth_inteval_pixel) / (ndepth - 1)
 
-def get_depth_range_samples(last_depth, ndepth, depth_inteval_pixel, shape=None,next_depth_inteval_pixel=None,inverse=False):
+def get_depth_range_samples(last_depth, ndepth, depth_inteval_pixel, shape=None, next_depth_inteval_pixel=None,inverse=False):
     # cur_depth: (B, H, W) or (B, D)
     # return depth_range_samples: (B, D, H, W)
     if not inverse:
@@ -594,6 +556,8 @@ def get_depth_range_samples(last_depth, ndepth, depth_inteval_pixel, shape=None,
                         )
 
         return depth_range_samples, stage_interval
+    
+    # inverse
     else:
         if last_depth.dim() == 2:
 
@@ -609,9 +573,9 @@ def get_depth_range_samples(last_depth, ndepth, depth_inteval_pixel, shape=None,
             new_interval = (last_depth_max - last_depth_min) / (ndepth - 1)  # (B, )
             stage_interval = new_interval[0]
             depth_values=[]
-            for bg,end in zip(last_depth_min,last_depth_max):
+            for bg, end in zip(last_depth_min, last_depth_max):
                 depth_values.append(torch.linspace(1 / bg , 1 / end, ndepth,device=last_depth.device))
-            depth_values=torch.stack(depth_values,dim=0)
+            depth_values = torch.stack(depth_values,dim=0)
             depth_range_samples_n = (1 / depth_values).unsqueeze(-1).unsqueeze(-1).repeat(1, 1, shape[0], shape[1])
             
             last_depth_min = last_depth[:, 0]+stage_interval
@@ -619,30 +583,29 @@ def get_depth_range_samples(last_depth, ndepth, depth_inteval_pixel, shape=None,
 
             new_interval = (last_depth_max - last_depth_min) / (ndepth - 1)  # (B, )
             stage_interval = new_interval[0]
-            depth_values=[]
-            for bg,end in zip(last_depth_min,last_depth_max):
+            depth_values = []
+            for bg, end in zip(last_depth_min, last_depth_max):
                 depth_values.append(torch.linspace(1 / bg , 1 / end, ndepth,device=last_depth.device))
-            depth_values=torch.stack(depth_values,dim=0)
+            depth_values = torch.stack(depth_values,dim=0)
             depth_range_samples_p = (1 / depth_values).unsqueeze(-1).unsqueeze(-1).repeat(1, 1, shape[0], shape[1])
             
-            coors=torch.stack( 
+            coors = torch.stack( 
                 [item.expand_as(depth_range_samples_p) \
                 for item in torch.meshgrid(*[torch.arange(0, s) for s in depth_range_samples_p.shape[-2:]])],
                 axis=-1).to(depth_range_samples_p.device)
-            mask=((coors[:,:,:,:,0]%2==0)&(coors[:,:,:,:,1]%2==0))|((coors[:,:,:,:,0]%2==1)&(coors[:,:,:,:,1]%2==1))
+            mask = ((coors[:,:,:,:,0]%2==0)&(coors[:,:,:,:,1]%2==0))|((coors[:,:,:,:,0]%2==1)&(coors[:,:,:,:,1]%2==1))
 
             depth_range_samples=torch.where(mask,depth_range_samples_n,depth_range_samples_p)
 
         else:
-            # depth_range_samples, stage_interval = get_cur_depth_range_samples_inverse(last_depth, ndepth, depth_inteval_pixel)
             depth_range_samples_n, stage_interval = get_cur_depth_range_samples_inverse_n(last_depth, ndepth, depth_inteval_pixel)
             depth_range_samples_p, stage_interval = get_cur_depth_range_samples_inverse_p(last_depth, ndepth, depth_inteval_pixel)
-            coors=torch.stack( 
+            coors = torch.stack( 
                 [item.expand_as(depth_range_samples_n) \
                 for item in torch.meshgrid(*[torch.arange(0, s) for s in last_depth.shape[-2:]])],
                 axis=-1).to(depth_range_samples_n.device)
-            mask=((coors[:,:,:,:,0]%2==0)&(coors[:,:,:,:,1]%2==0))|((coors[:,:,:,:,0]%2==1)&(coors[:,:,:,:,1]%2==1))
-            depth_range_samples=torch.where(mask,\
+            mask = ((coors[:,:,:,:,0]%2==0)&(coors[:,:,:,:,1]%2==0))|((coors[:,:,:,:,0]%2==1)&(coors[:,:,:,:,1]%2==1))
+            depth_range_samples = torch.where(mask,\
                         depth_range_samples_n,
                         depth_range_samples_p
                         )

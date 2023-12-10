@@ -6,8 +6,8 @@ def mvs_loss(inputs, depth_gt_ms, mask_ms, mode, **kwargs):
     depth_loss_weights = kwargs.get("dlossw", [1.0 for k in inputs.keys() if "stage" in k])
     total_loss = torch.tensor(0.0, dtype=torch.float32, device=mask_ms["stage1"].device, requires_grad=False)
     for (stage_inputs, stage_key) in [(inputs[k], k) for k in inputs.keys() if "stage" in k]:
-        prob_volume = stage_inputs["prob_volume"]  if "global_volume" not in stage_inputs else stage_inputs["global_volume"]# (b, d, h, w)
-        depth_values = stage_inputs["depth_values"] if "depth_values_new" not in stage_inputs else  stage_inputs["depth_values_new"]# (b, d, h, w)
+        prob_volume = stage_inputs["prob_volume"]  if "global_volume" not in stage_inputs else stage_inputs["global_volume"] # (b, d, h, w)
+        depth_values = stage_inputs["depth_values"] if "depth_values_new" not in stage_inputs else  stage_inputs["depth_values_new"] # (b, d, h, w)
         interval = stage_inputs["interval"]  # float
         depth_gt = depth_gt_ms[stage_key]  # (b, h, w)
         mask = mask_ms[stage_key]
@@ -17,7 +17,6 @@ def mvs_loss(inputs, depth_gt_ms, mask_ms, mode, **kwargs):
         stage_idx = int(stage_key.replace("stage", "")) - 1
         stage_weight = depth_loss_weights[stage_idx]
         
-
         if mode == "regression":
         
             depth_sub_plus=stage_inputs["depth_sub_plus"]
@@ -47,7 +46,6 @@ def mvs_loss(inputs, depth_gt_ms, mask_ms, mode, **kwargs):
                 Monte_Carlo_sampling_loss(torch.where(~coor_mask,huge_min,huge_max),depth_gt,mask,torch.ones_like(depth_gt)*stage_weight,mode="center",regress_fn=regression_loss)
 
             total_loss+=(loss_depth+loss_var_small+loss_var_huge+loss_m)
-
 
             ###refine***********************
 
@@ -147,12 +145,9 @@ def Monte_Carlo_sampling_loss(depth_est, depth_gt, mask, weight,mode="center",re
             # reflect_weight=reflect_weight[sampled_mask]
 
         loss = F.smooth_l1_loss((reflect_weight*sampled_est)[sampled_mask], (reflect_weight*sampled_gt)[sampled_mask], reduction='mean')
-
-    # loss = loss* weight
-
-    
     
     return loss
+
 def regression_loss(depth_est, depth_gt, mask, weight):
     loss = F.smooth_l1_loss(depth_est[mask], depth_gt[mask], reduction='none')
     loss = (loss* weight[mask]).mean()
@@ -185,6 +180,7 @@ def binary_cross_entropy_with_logits(input, target, weight=None, size_average=No
         return ce_loss.mean()
     else:
         return ce_loss.sum()
+
 def classification_loss_1(prob_volume, depth_values, interval, depth_gt, mask, weight):
     depth_gt_volume = depth_gt.unsqueeze(1).expand_as(depth_values)  # (b, d, h, w)
 
@@ -207,7 +203,6 @@ def classification_loss(prob_volume, depth_values, interval, depth_gt, mask, wei
     loss = -torch.sum(gt_index_volume * torch.log(prob_volume), dim=1)[mask].mean()
     loss = loss * weight
     return loss
-
 
 def gfocal_loss(prob_volume, depth_values, interval, depth_gt, mask, weight, gamma, alpha):
     depth_gt_volume = depth_gt.unsqueeze(1).expand_as(depth_values)  # (b, d, h, w)
@@ -249,6 +244,7 @@ def unified_step_focal_loss(prob_volume, depth_values, interval, depth_gt, mask,
     loss = (F.binary_cross_entropy(prob_volume, gt_unity_index_volume, reduction="none") * focal_weight * mask).sum() / mask.sum()
     loss = loss * weight
     return loss
+
 def unified_focal_loss(prob_volume, depth_values, interval, depth_gt, mask, weight, gamma, alpha):
     depth_gt_volume = depth_gt.unsqueeze(1).expand_as(depth_values)  # (b, d, h, w)
 
@@ -268,8 +264,10 @@ def unified_focal_loss(prob_volume, depth_values, interval, depth_gt, mask, weig
     loss = (F.binary_cross_entropy(prob_volume, gt_unity_index_volume, reduction="none") * focal_weight * mask).sum() / mask.sum()
     loss = loss * weight
     return loss
+
 def sigmoid(x, base=2.71828):
     return 1 / (1 + torch.pow(base, -x))
+
 def entropy_loss(prob_volume, depth_gt, mask, depth_value, return_prob_map=False):
     # from AA
     mask_true = mask
@@ -307,8 +305,6 @@ def entropy_loss(prob_volume, depth_gt, mask, depth_value, return_prob_map=False
 
 def entropy_loss_expand(prob_volume, depth_gt, mask, depth_value, return_prob_map=False):
     # from AA
-    
-    
     shape = depth_gt.shape          # B,H,W
     depth_gt=depth_gt.unsqueeze(1).repeat(1,3,1,1).view(-1,shape[-2],shape[-1])
     mask=mask.unsqueeze(1).repeat(1,3,1,1).view(-1,shape[-2],shape[-1])
