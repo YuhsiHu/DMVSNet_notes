@@ -74,7 +74,7 @@ class Deconv2d(nn.Module):
        Notes:
            Default momentum for batch normalization is set to be 0.01,
 
-       """
+    """
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
                  relu=True, bn=True, bn_momentum=0.1, init_method="xavier", **kwargs):
         super(Deconv2d, self).__init__()
@@ -129,7 +129,6 @@ class Conv3d(nn.Module):
         self.conv = nn.Conv3d(in_channels, out_channels, kernel_size, stride=stride,
                               bias=(not bn), **kwargs)
         self.bn = nn.BatchNorm3d(out_channels, momentum=bn_momentum) if bn else None
-        # self.bn = nn.GroupNorm(8, out_channels) if bn else None
         self.relu = relu
 
     def forward(self, x):
@@ -159,7 +158,7 @@ class Deconv3d(nn.Module):
        Notes:
            Default momentum for batch normalization is set to be 0.01,
 
-       """
+    """
     def __init__(self, in_channels, out_channels, kernel_size=3, stride=1,
                  relu=True, bn=True, bn_momentum=0.1, init_method="xavier", **kwargs):
         super(Deconv3d, self).__init__()
@@ -170,7 +169,6 @@ class Deconv3d(nn.Module):
         self.conv = nn.ConvTranspose3d(in_channels, out_channels, kernel_size, stride=stride,
                                        bias=(not bn), **kwargs)
         self.bn = nn.BatchNorm3d(out_channels, momentum=bn_momentum) if bn else None
-        # self.bn = nn.GroupNorm(8, out_channels) if bn else None
         self.relu = relu
 
     def forward(self, x):
@@ -294,18 +292,16 @@ class FeatureNet(nn.Module):
         outputs = {}
 
         out = self.out1(intra_feat)
-        # outputs["stage1"] = out
-        outputs["stage1"],outputs["stage1_c"]= out.split([out.shape[1]//2,out.shape[1]//2],1)
+        # seperate features into 2 and use them for coarse/refine in cost_aggregation
+        outputs["stage1"], outputs["stage1_c"] = out.split([out.shape[1]//2, out.shape[1]//2], 1)
         
         intra_feat = F.interpolate(intra_feat, scale_factor=2, mode="nearest") + self.inner1(conv1)
         out = self.out2(intra_feat)
-        # outputs["stage2"] = out
-        outputs["stage2"],outputs["stage2_c"]= out.split([out.shape[1]//2,out.shape[1]//2],1)
+        outputs["stage2"], outputs["stage2_c"] = out.split([out.shape[1]//2, out.shape[1]//2], 1)
 
         intra_feat = F.interpolate(intra_feat, scale_factor=2, mode="nearest") + self.inner2(conv0)
         out = self.out3(intra_feat)
-        # outputs["stage3"] = out
-        outputs["stage3"],outputs["stage3_c"]= out.split([out.shape[1]//2,out.shape[1]//2],1)
+        outputs["stage3"], outputs["stage3_c"] = out.split([out.shape[1]//2, out.shape[1]//2],1)
 
         return outputs
 
@@ -480,7 +476,7 @@ def get_cur_depth_range_samples_inverse(last_depth, ndepth, depth_inteval_pixel)
                                                                       requires_grad=False).reshape(1, -1, 1,
                                                                                                    1) * new_interval.unsqueeze(1))
                 
-    depth_range_samples=1/inverse_depth_range_samples
+    depth_range_samples = 1 / inverse_depth_range_samples
     return depth_range_samples, (ndepth * depth_inteval_pixel) / (ndepth - 1)
 
 def get_cur_depth_range_samples_inverse_p(last_depth, ndepth, depth_inteval_pixel):
@@ -496,7 +492,7 @@ def get_cur_depth_range_samples_inverse_p(last_depth, ndepth, depth_inteval_pixe
                                                                       requires_grad=False).reshape(1, -1, 1,
                                                                                                    1) * new_interval.unsqueeze(1))
                 
-    depth_range_samples=1/inverse_depth_range_samples
+    depth_range_samples = 1 / inverse_depth_range_samples
     return depth_range_samples, (ndepth * depth_inteval_pixel) / (ndepth - 1)
 
 def get_cur_depth_range_samples_inverse_n(last_depth, ndepth, depth_inteval_pixel):
@@ -504,15 +500,15 @@ def get_cur_depth_range_samples_inverse_n(last_depth, ndepth, depth_inteval_pixe
     # return depth_range_values: (B, D, H, W)
     last_depth_min = (last_depth - (ndepth+2) / 2 * depth_inteval_pixel)  # (B, H, W)
     last_depth_max = (last_depth + (ndepth-2) / 2 * depth_inteval_pixel)
-    inverse_min = 1/last_depth_min
-    inverse_max = 1/last_depth_max
+    inverse_min = 1 / last_depth_min
+    inverse_max = 1 / last_depth_max
     new_interval = (inverse_max-inverse_min)/(ndepth-1)
     inverse_depth_range_samples = inverse_min.unsqueeze(1)+(torch.arange(0, ndepth, device=last_depth.device,
                                                                       dtype=last_depth.dtype,
                                                                       requires_grad=False).reshape(1, -1, 1,
                                                                                                    1) * new_interval.unsqueeze(1))
                 
-    depth_range_samples=1/inverse_depth_range_samples
+    depth_range_samples = 1 / inverse_depth_range_samples
     return depth_range_samples, (ndepth * depth_inteval_pixel) / (ndepth - 1)
 
 def get_depth_range_samples(last_depth, ndepth, depth_inteval_pixel, shape=None, next_depth_inteval_pixel=None, inverse=False):
@@ -532,25 +528,24 @@ def get_depth_range_samples(last_depth, ndepth, depth_inteval_pixel, shape=None,
             # (B, D, H, W)
             depth_range_samples = depth_range_samples.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, shape[0], shape[1])
             
-            coors=torch.stack( 
+            coors = torch.stack( 
                 [item.expand_as(depth_range_samples) \
                 for item in torch.meshgrid(*[torch.arange(0, s) for s in depth_range_samples.shape[-2:]])],
                 axis=-1).to(depth_range_samples.device)
-            mask=((coors[:,:,:,:,0]%2==0)&(coors[:,:,:,:,1]%2==0))|((coors[:,:,:,:,0]%2==1)&(coors[:,:,:,:,1]%2==1))
+            mask = ((coors[:,:,:,:,0]%2==0)&(coors[:,:,:,:,1]%2==0))|((coors[:,:,:,:,0]%2==1)&(coors[:,:,:,:,1]%2==1))
 
-            depth_range_samples=torch.where(mask,depth_range_samples-stage_interval,depth_range_samples+stage_interval)
-            # depth_range_samples=torch.ma
+            depth_range_samples = torch.where(mask, depth_range_samples - stage_interval, depth_range_samples + stage_interval)
 
         else:
 
             depth_range_samples_n, stage_interval = get_cur_depth_range_samples_n(last_depth, ndepth, depth_inteval_pixel)
             depth_range_samples_p, stage_interval = get_cur_depth_range_samples_p(last_depth, ndepth, depth_inteval_pixel)
-            coors=torch.stack( 
+            coors = torch.stack( 
                 [item.expand_as(depth_range_samples_n) \
                 for item in torch.meshgrid(*[torch.arange(0, s) for s in last_depth.shape[-2:]])],
                 axis=-1).to(depth_range_samples_n.device)
-            mask=((coors[:,:,:,:,0]%2==0)&(coors[:,:,:,:,1]%2==0))|((coors[:,:,:,:,0]%2==1)&(coors[:,:,:,:,1]%2==1))
-            depth_range_samples=torch.where(mask,\
+            mask = ((coors[:,:,:,:,0]%2==0)&(coors[:,:,:,:,1]%2==0))|((coors[:,:,:,:,0]%2==1)&(coors[:,:,:,:,1]%2==1))
+            depth_range_samples = torch.where(mask,\
                         depth_range_samples_n,
                         depth_range_samples_p
                         )

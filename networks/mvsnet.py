@@ -39,7 +39,7 @@ class DepthNet(nn.Module):
         small_stack = torch.stack((3 * small_min - 2 * small_max, 2 * small_min - small_max, small_min, small_max, 2 * small_max - small_min, 3 * small_max - 2 * small_min), 1) # B 6 H W
         small_stack_d = torch.stack((3 * small_min_d - 2 * small_max_d, 2 * small_min_d-small_max_d, small_min_d, small_max_d, 2 * small_max_d - small_min_d, 3 * small_max_d - 2 * small_min_d), 1) # B 6 H W
         huge_stack = torch.stack((3 * huge_min - 2 * huge_max, 2*huge_min - huge_max, huge_min, huge_max, 2 * huge_max - huge_min, 3 * huge_max - 2 * huge_min), 1) # B 6 H W
-        huge_stack_d = torch.stack((3 * huge_min_d - 2 * huge_max_d, 2*huge_min_d - huge_max_d, huge_min_d, huge_max_d, 2 * huge_max_d - huge_min_d, 3 * huge_max_d - 2 * huge_min_d), 1) # B 6 H W
+        huge_stack_d = torch.stack((3 * huge_min_d - 2 * huge_max_d, 2 * huge_min_d - huge_max_d, huge_min_d, huge_max_d, 2 * huge_max_d - huge_min_d, 3 * huge_max_d - 2 * huge_min_d), 1) # B 6 H W
 
         depth_values_c = torch.zeros_like(depth_sub_plus) # B G=2+2 H W
         depth_values_c = torch.where(mask_00.unsqueeze(1), small_stack[:,:-2], depth_values_c)
