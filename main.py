@@ -6,7 +6,6 @@ parser = argparse.ArgumentParser(description="UniMVSNet args")
 # network
 parser.add_argument("--fea_mode", type=str, default="fpn", choices=["fpn", "unet","hrnet"])
 parser.add_argument("--agg_mode", type=str, default="variance", choices=["variance", "adaptive","corr","corr_adaptive","corr_dynamic","corr_diff_att_adaptive","corr_dynamic_adaptive","corr_dynamic_adaptive_diff","corr_dynamic_adaptive_diff_att"])
-# parser.add_argument("--agg_mode", type=str, default="variance", choices=["variance", "adaptive"])
 
 parser.add_argument("--depth_mode", type=str, default="regression", choices=["regression", "classification", "unification","gfocal"])
 parser.add_argument("--ndepths", type=int, nargs='+', default=[48, 32, 8])
@@ -74,7 +73,6 @@ parser.add_argument("--vis", action="store_true")
 parser.add_argument('--depth_path', type=str)
 parser.add_argument('--depth_img_save_dir', type=str, default="./")
 
-
 # device and distributed
 parser.add_argument("--no_cuda", action="store_true")
 parser.add_argument("--local_rank", type=int, default=0)
@@ -82,7 +80,6 @@ parser.add_argument('--dist-url', default='env://', help='url used to set up dis
 args = parser.parse_args()
 
 if __name__ == '__main__':
-    # os.environ['CUDA_VISIBLE_DEVICES']="2"
 
     model = Model(args)
     print(args)

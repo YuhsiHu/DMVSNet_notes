@@ -72,7 +72,6 @@ class Model:
         self.blendmvs=('dataset_low_res' in args.datapath)
 
     def main(self):
-        # print(self.args.test)
         if self.args.vis:
             self.visualization()
             return
@@ -378,8 +377,6 @@ class Model:
                     img = np.clip(np.transpose(img, (1, 2, 0)) * 255, 0, 255).astype(np.uint8)
                     img_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
                     cv2.imwrite(img_filename, img_bgr)
-
-
 
             torch.cuda.empty_cache()
 

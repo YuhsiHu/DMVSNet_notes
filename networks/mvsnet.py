@@ -71,12 +71,12 @@ class DepthNet(nn.Module):
         coors=torch.stack( 
             [item.unsqueeze(0).expand_as(depth_sub_plus[:,0]) for item in torch.meshgrid(*[torch.arange(0, s) for s in depth_sub_plus[:,0].shape[-2:]])],
             axis=-1).to(depth_sub_plus[:,0].device)
+
         mask_00 = ((coors[:,:,:,0]%2==0)&(coors[:,:,:,1]%2==0))
         mask_01 = ((coors[:,:,:,0]%2==0)&(coors[:,:,:,1]%2==1))
         mask_10 = ((coors[:,:,:,0]%2==1)&(coors[:,:,:,1]%2==0))
         mask_11 = ((coors[:,:,:,0]%2==1)&(coors[:,:,:,1]%2==1))
         
-
         depth = torch.zeros_like(depth_sub_plus[:,0])
 
         depth = torch.where(mask_00, small_min, depth)

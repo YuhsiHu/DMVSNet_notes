@@ -222,10 +222,10 @@ def homo_warping(src_fea, src_proj, ref_proj, depth_values):
         grid = proj_xy
 
     warped_src_fea = F.grid_sample(src_fea, grid.view(batch, num_depth * height, width, 2), mode='bilinear',
-                                   padding_mode='zeros',align_corners=True).type(torch.float32)
+                                   padding_mode='zeros', align_corners=True).type(torch.float32)
     warped_src_fea = warped_src_fea.view(batch, channels, num_depth, height, width)
 
-    return warped_src_fea,grid.view(batch, num_depth,height, width, 2)
+    return warped_src_fea,grid.view(batch, num_depth, height, width, 2)
 
 
 class DeConv2dFuse(nn.Module):
@@ -472,10 +472,10 @@ def get_cur_depth_range_samples_inverse(last_depth, ndepth, depth_inteval_pixel)
     # return depth_range_values: (B, D, H, W)
     last_depth_min = (last_depth - ndepth / 2 * depth_inteval_pixel)  # (B, H, W)
     last_depth_max = (last_depth + ndepth / 2 * depth_inteval_pixel)
-    inverse_min=1/last_depth_min
-    inverse_max=1/last_depth_max
-    new_interval=(inverse_max-inverse_min)/(ndepth-1)
-    inverse_depth_range_samples=inverse_min.unsqueeze(1)+(torch.arange(0, ndepth, device=last_depth.device,
+    inverse_min = 1/last_depth_min
+    inverse_max = 1/last_depth_max
+    new_interval = (inverse_max-inverse_min)/(ndepth-1)
+    inverse_depth_range_samples = inverse_min.unsqueeze(1)+(torch.arange(0, ndepth, device=last_depth.device,
                                                                       dtype=last_depth.dtype,
                                                                       requires_grad=False).reshape(1, -1, 1,
                                                                                                    1) * new_interval.unsqueeze(1))
@@ -488,10 +488,10 @@ def get_cur_depth_range_samples_inverse_p(last_depth, ndepth, depth_inteval_pixe
     # return depth_range_values: (B, D, H, W)
     last_depth_min = (last_depth - (ndepth-2) / 2 * depth_inteval_pixel)  # (B, H, W)
     last_depth_max = (last_depth + (ndepth+2) / 2 * depth_inteval_pixel)
-    inverse_min=1/last_depth_min
-    inverse_max=1/last_depth_max
-    new_interval=(inverse_max-inverse_min)/(ndepth-1)
-    inverse_depth_range_samples=inverse_min.unsqueeze(1)+(torch.arange(0, ndepth, device=last_depth.device,
+    inverse_min = 1/last_depth_min
+    inverse_max = 1/last_depth_max
+    new_interval = (inverse_max-inverse_min)/(ndepth-1)
+    inverse_depth_range_samples = inverse_min.unsqueeze(1)+(torch.arange(0, ndepth, device=last_depth.device,
                                                                       dtype=last_depth.dtype,
                                                                       requires_grad=False).reshape(1, -1, 1,
                                                                                                    1) * new_interval.unsqueeze(1))
@@ -504,10 +504,10 @@ def get_cur_depth_range_samples_inverse_n(last_depth, ndepth, depth_inteval_pixe
     # return depth_range_values: (B, D, H, W)
     last_depth_min = (last_depth - (ndepth+2) / 2 * depth_inteval_pixel)  # (B, H, W)
     last_depth_max = (last_depth + (ndepth-2) / 2 * depth_inteval_pixel)
-    inverse_min=1/last_depth_min
-    inverse_max=1/last_depth_max
-    new_interval=(inverse_max-inverse_min)/(ndepth-1)
-    inverse_depth_range_samples=inverse_min.unsqueeze(1)+(torch.arange(0, ndepth, device=last_depth.device,
+    inverse_min = 1/last_depth_min
+    inverse_max = 1/last_depth_max
+    new_interval = (inverse_max-inverse_min)/(ndepth-1)
+    inverse_depth_range_samples = inverse_min.unsqueeze(1)+(torch.arange(0, ndepth, device=last_depth.device,
                                                                       dtype=last_depth.dtype,
                                                                       requires_grad=False).reshape(1, -1, 1,
                                                                                                    1) * new_interval.unsqueeze(1))
@@ -515,7 +515,7 @@ def get_cur_depth_range_samples_inverse_n(last_depth, ndepth, depth_inteval_pixe
     depth_range_samples=1/inverse_depth_range_samples
     return depth_range_samples, (ndepth * depth_inteval_pixel) / (ndepth - 1)
 
-def get_depth_range_samples(last_depth, ndepth, depth_inteval_pixel, shape=None, next_depth_inteval_pixel=None,inverse=False):
+def get_depth_range_samples(last_depth, ndepth, depth_inteval_pixel, shape=None, next_depth_inteval_pixel=None, inverse=False):
     # cur_depth: (B, H, W) or (B, D)
     # return depth_range_samples: (B, D, H, W)
     if not inverse:
@@ -559,47 +559,47 @@ def get_depth_range_samples(last_depth, ndepth, depth_inteval_pixel, shape=None,
     
     # inverse
     else:
+        # first stage, last depth shape: B 192
         if last_depth.dim() == 2:
-
             last_depth_min = last_depth[:, 0]  # (B,)
             last_depth_max = last_depth[:, -1]
+            # calculate new interval
             new_interval = (last_depth_max - last_depth_min) / (ndepth - 1)  # (B, )
             stage_interval = new_interval[0]
-
-
-            last_depth_min = last_depth[:, 0]-stage_interval
-            last_depth_max = last_depth[:, -1]-stage_interval
-
+            # for depth_range_samples_n
+            last_depth_min = last_depth[:, 0] - stage_interval
+            last_depth_max = last_depth[:, -1] - stage_interval
             new_interval = (last_depth_max - last_depth_min) / (ndepth - 1)  # (B, )
             stage_interval = new_interval[0]
             depth_values=[]
             for bg, end in zip(last_depth_min, last_depth_max):
-                depth_values.append(torch.linspace(1 / bg , 1 / end, ndepth,device=last_depth.device))
-            depth_values = torch.stack(depth_values,dim=0)
-            depth_range_samples_n = (1 / depth_values).unsqueeze(-1).unsqueeze(-1).repeat(1, 1, shape[0], shape[1])
-            
-            last_depth_min = last_depth[:, 0]+stage_interval
-            last_depth_max = last_depth[:, -1]+stage_interval
-
+                depth_values.append(torch.linspace(1 / bg , 1 / end, ndepth, device=last_depth.device))
+            depth_values = torch.stack(depth_values, dim=0)
+            depth_range_samples_n = (1 / depth_values).unsqueeze(-1).unsqueeze(-1).repeat(1, 1, shape[0], shape[1]) # B D H W
+            # for depth_range_samples_p
+            last_depth_min = last_depth[:, 0] + stage_interval
+            last_depth_max = last_depth[:, -1] + stage_interval
             new_interval = (last_depth_max - last_depth_min) / (ndepth - 1)  # (B, )
             stage_interval = new_interval[0]
             depth_values = []
             for bg, end in zip(last_depth_min, last_depth_max):
-                depth_values.append(torch.linspace(1 / bg , 1 / end, ndepth,device=last_depth.device))
-            depth_values = torch.stack(depth_values,dim=0)
-            depth_range_samples_p = (1 / depth_values).unsqueeze(-1).unsqueeze(-1).repeat(1, 1, shape[0], shape[1])
-            
+                depth_values.append(torch.linspace(1 / bg , 1 / end, ndepth, device=last_depth.device))
+            depth_values = torch.stack(depth_values, dim=0)
+            depth_range_samples_p = (1 / depth_values).unsqueeze(-1).unsqueeze(-1).repeat(1, 1, shape[0], shape[1]) # B D H W
+            # create a coordinate based on Ndepth H W
             coors = torch.stack( 
                 [item.expand_as(depth_range_samples_p) \
                 for item in torch.meshgrid(*[torch.arange(0, s) for s in depth_range_samples_p.shape[-2:]])],
-                axis=-1).to(depth_range_samples_p.device)
-            mask = ((coors[:,:,:,:,0]%2==0)&(coors[:,:,:,:,1]%2==0))|((coors[:,:,:,:,0]%2==1)&(coors[:,:,:,:,1]%2==1))
-
-            depth_range_samples=torch.where(mask,depth_range_samples_n,depth_range_samples_p)
-
+                axis=-1).to(depth_range_samples_p.device) # B D H W 2
+            # create a mask based on even/odd
+            mask = ((coors[:,:,:,:,0]%2==0)&(coors[:,:,:,:,1]%2==0))|((coors[:,:,:,:,0]%2==1)&(coors[:,:,:,:,1]%2==1)) # B D H W
+            # get final depth samples
+            depth_range_samples = torch.where(mask, depth_range_samples_n, depth_range_samples_p)
+        # last depth shape: B D H W
         else:
             depth_range_samples_n, stage_interval = get_cur_depth_range_samples_inverse_n(last_depth, ndepth, depth_inteval_pixel)
             depth_range_samples_p, stage_interval = get_cur_depth_range_samples_inverse_p(last_depth, ndepth, depth_inteval_pixel)
+            
             coors = torch.stack( 
                 [item.expand_as(depth_range_samples_n) \
                 for item in torch.meshgrid(*[torch.arange(0, s) for s in last_depth.shape[-2:]])],

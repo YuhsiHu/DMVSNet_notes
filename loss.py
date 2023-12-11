@@ -5,6 +5,7 @@ import numpy as np
 def mvs_loss(inputs, depth_gt_ms, mask_ms, mode, **kwargs):
     depth_loss_weights = kwargs.get("dlossw", [1.0 for k in inputs.keys() if "stage" in k])
     total_loss = torch.tensor(0.0, dtype=torch.float32, device=mask_ms["stage1"].device, requires_grad=False)
+    # calculate loss for each stage
     for (stage_inputs, stage_key) in [(inputs[k], k) for k in inputs.keys() if "stage" in k]:
         prob_volume = stage_inputs["prob_volume"]  if "global_volume" not in stage_inputs else stage_inputs["global_volume"] # (b, d, h, w)
         depth_values = stage_inputs["depth_values"] if "depth_values_new" not in stage_inputs else  stage_inputs["depth_values_new"] # (b, d, h, w)
@@ -18,47 +19,45 @@ def mvs_loss(inputs, depth_gt_ms, mask_ms, mode, **kwargs):
         stage_weight = depth_loss_weights[stage_idx]
         
         if mode == "regression":
-        
-            depth_sub_plus=stage_inputs["depth_sub_plus"]
-            depth_sup_plus_small,depth_sup_plus_huge=depth_sub_plus.split([2,2],dim=1)
-            loss_depth=2*regression_loss(depth_sup_plus_small, depth_gt.unsqueeze(1).expand_as(depth_sup_plus_small), mask.unsqueeze(1).expand_as(depth_sup_plus_small),torch.ones_like(depth_sup_plus_small)*stage_weight)\
-                        +2*regression_loss(depth_sup_plus_huge, depth_gt.unsqueeze(1).expand_as(depth_sup_plus_huge), mask.unsqueeze(1).expand_as(depth_sup_plus_huge),torch.ones_like(depth_sup_plus_huge)*stage_weight)
+            depth_sub_plus = stage_inputs["depth_sub_plus"]
+            depth_sup_plus_small, depth_sup_plus_huge = depth_sub_plus.split([2,2], dim=1)
+            loss_depth = 2 * regression_loss(depth_sup_plus_small, depth_gt.unsqueeze(1).expand_as(depth_sup_plus_small), mask.unsqueeze(1).expand_as(depth_sup_plus_small), torch.ones_like(depth_sup_plus_small)*stage_weight)\
+                        +2 * regression_loss(depth_sup_plus_huge, depth_gt.unsqueeze(1).expand_as(depth_sup_plus_huge), mask.unsqueeze(1).expand_as(depth_sup_plus_huge), torch.ones_like(depth_sup_plus_huge)*stage_weight)
             
             
-            var_gt=torch.where((depth_sub_plus[:,0]-depth_gt).abs()<(depth_sub_plus[:,1]-depth_gt).abs(),(depth_sub_plus[:,1]-depth_gt).abs(),(depth_sub_plus[:,0]-depth_gt).abs())
-            loss_var_small=regression_loss((depth_sub_plus[:,0]-depth_sub_plus[:,1]).abs(), var_gt, mask,torch.ones_like(var_gt)*stage_weight)
+            var_gt = torch.where((depth_sub_plus[:,0]-depth_gt).abs()<(depth_sub_plus[:,1]-depth_gt).abs(), (depth_sub_plus[:,1]-depth_gt).abs(), (depth_sub_plus[:,0]-depth_gt).abs())
+            loss_var_small = regression_loss((depth_sub_plus[:,0]-depth_sub_plus[:,1]).abs(), var_gt, mask,torch.ones_like(var_gt)*stage_weight)
 
-            var_gt=torch.where((depth_sub_plus[:,2]-depth_gt).abs()<(depth_sub_plus[:,3]-depth_gt).abs(),(depth_sub_plus[:,3]-depth_gt).abs(),(depth_sub_plus[:,2]-depth_gt).abs())
-            loss_var_huge=regression_loss((depth_sub_plus[:,2]-depth_sub_plus[:,3]).abs(), var_gt, mask,torch.ones_like(var_gt)*stage_weight)
+            var_gt = torch.where((depth_sub_plus[:,2]-depth_gt).abs()<(depth_sub_plus[:,3]-depth_gt).abs(), (depth_sub_plus[:,3]-depth_gt).abs(), (depth_sub_plus[:,2]-depth_gt).abs())
+            loss_var_huge = regression_loss((depth_sub_plus[:,2]-depth_sub_plus[:,3]).abs(), var_gt, mask,torch.ones_like(var_gt)*stage_weight)
             
             
-            coors=torch.stack( 
+            coors = torch.stack( 
             [item.unsqueeze(0).expand_as(depth_sub_plus[:,0]) for item in torch.meshgrid(*[torch.arange(0, s) for s in depth_sub_plus[:,0].shape[-2:]])],
             axis=-1).to(depth_sub_plus[:,0].device)
-            coor_mask=((coors[:,:,:,0]%2==0)&(coors[:,:,:,1]%2==0))|((coors[:,:,:,0]%2==1)&(coors[:,:,:,1]%2==1))# 
+            coor_mask = ((coors[:,:,:,0]%2==0)&(coors[:,:,:,1]%2==0))|((coors[:,:,:,0]%2==1)&(coors[:,:,:,1]%2==1))# 
             
-            small_min,small_max=depth_sup_plus_small.min(1)[0],depth_sup_plus_small.max(1)[0]
-            huge_min,huge_max=depth_sup_plus_huge.min(1)[0],depth_sup_plus_huge.max(1)[0]
+            small_min, small_max = depth_sup_plus_small.min(1)[0],depth_sup_plus_small.max(1)[0]
+            huge_min, huge_max = depth_sup_plus_huge.min(1)[0],depth_sup_plus_huge.max(1)[0]
         
-            loss_m=Monte_Carlo_sampling_loss(torch.where(coor_mask,small_min,small_max),depth_gt,mask,torch.ones_like(depth_gt)*stage_weight,mode="center",regress_fn=regression_loss)+\
-                Monte_Carlo_sampling_loss(torch.where(~coor_mask,small_min,small_max),depth_gt,mask,torch.ones_like(depth_gt)*stage_weight,mode="center",regress_fn=regression_loss)+\
-                Monte_Carlo_sampling_loss(torch.where(coor_mask,huge_min,huge_max),depth_gt,mask,torch.ones_like(depth_gt)*stage_weight,mode="center",regress_fn=regression_loss)+\
-                Monte_Carlo_sampling_loss(torch.where(~coor_mask,huge_min,huge_max),depth_gt,mask,torch.ones_like(depth_gt)*stage_weight,mode="center",regress_fn=regression_loss)
+            loss_m = Monte_Carlo_sampling_loss(torch.where(coor_mask, small_min, small_max), depth_gt,mask, torch.ones_like(depth_gt)*stage_weight, mode="center", regress_fn=regression_loss)+\
+                Monte_Carlo_sampling_loss(torch.where(~coor_mask, small_min, small_max), depth_gt,mask, torch.ones_like(depth_gt)*stage_weight, mode="center", regress_fn=regression_loss)+\
+                Monte_Carlo_sampling_loss(torch.where(coor_mask, huge_min, huge_max), depth_gt,mask, torch.ones_like(depth_gt)*stage_weight, mode="center", regress_fn=regression_loss)+\
+                Monte_Carlo_sampling_loss(torch.where(~coor_mask, huge_min, huge_max), depth_gt,mask, torch.ones_like(depth_gt)*stage_weight, mode="center", regress_fn=regression_loss)
 
-            total_loss+=(loss_depth+loss_var_small+loss_var_huge+loss_m)
+            total_loss += (loss_depth + loss_var_small + loss_var_huge + loss_m)
 
             ###refine***********************
-
-            depth_sub_plus=stage_inputs["depth_sub_plus_refine"]
-            depth_sup_plus_small,depth_sup_plus_huge=depth_sub_plus.split([2,2],dim=1)
-            loss_depth=2*regression_loss(depth_sup_plus_small, depth_gt.unsqueeze(1).expand_as(depth_sup_plus_small), mask.unsqueeze(1).expand_as(depth_sup_plus_small),torch.ones_like(depth_sup_plus_small)*stage_weight)\
-                        +2*regression_loss(depth_sup_plus_huge, depth_gt.unsqueeze(1).expand_as(depth_sup_plus_huge), mask.unsqueeze(1).expand_as(depth_sup_plus_huge),torch.ones_like(depth_sup_plus_huge)*stage_weight)
+            depth_sub_plus = stage_inputs["depth_sub_plus_refine"]
+            depth_sup_plus_small, depth_sup_plus_huge = depth_sub_plus.split([2,2], dim=1)
+            loss_depth = 2 * regression_loss(depth_sup_plus_small, depth_gt.unsqueeze(1).expand_as(depth_sup_plus_small), mask.unsqueeze(1).expand_as(depth_sup_plus_small), torch.ones_like(depth_sup_plus_small)*stage_weight)\
+                        +2 * regression_loss(depth_sup_plus_huge, depth_gt.unsqueeze(1).expand_as(depth_sup_plus_huge), mask.unsqueeze(1).expand_as(depth_sup_plus_huge), torch.ones_like(depth_sup_plus_huge)*stage_weight)
             
-            var_gt=torch.where((depth_sub_plus[:,0]-depth_gt).abs()<(depth_sub_plus[:,1]-depth_gt).abs(),(depth_sub_plus[:,1]-depth_gt).abs(),(depth_sub_plus[:,0]-depth_gt).abs())
-            loss_var_small=regression_loss((depth_sub_plus[:,0]-depth_sub_plus[:,1]).abs(), var_gt, mask,torch.ones_like(var_gt)*stage_weight)
+            var_gt = torch.where((depth_sub_plus[:,0]-depth_gt).abs()<(depth_sub_plus[:,1]-depth_gt).abs(), (depth_sub_plus[:,1]-depth_gt).abs(), (depth_sub_plus[:,0]-depth_gt).abs())
+            loss_var_small = regression_loss((depth_sub_plus[:,0]-depth_sub_plus[:,1]).abs(), var_gt, mask,torch.ones_like(var_gt)*stage_weight)
 
-            var_gt=torch.where((depth_sub_plus[:,2]-depth_gt).abs()<(depth_sub_plus[:,3]-depth_gt).abs(),(depth_sub_plus[:,3]-depth_gt).abs(),(depth_sub_plus[:,2]-depth_gt).abs())
-            loss_var_huge=regression_loss((depth_sub_plus[:,2]-depth_sub_plus[:,3]).abs(), var_gt, mask,torch.ones_like(var_gt)*stage_weight)
+            var_gt = torch.where((depth_sub_plus[:,2]-depth_gt).abs()<(depth_sub_plus[:,3]-depth_gt).abs(), (depth_sub_plus[:,3]-depth_gt).abs(), (depth_sub_plus[:,2]-depth_gt).abs())
+            loss_var_huge = regression_loss((depth_sub_plus[:,2]-depth_sub_plus[:,3]).abs(), var_gt, mask, torch.ones_like(var_gt)*stage_weight)
             
             
             coors=torch.stack( 
@@ -66,22 +65,20 @@ def mvs_loss(inputs, depth_gt_ms, mask_ms, mode, **kwargs):
             axis=-1).to(depth_sub_plus[:,0].device)
             coor_mask=((coors[:,:,:,0]%2==0)&(coors[:,:,:,1]%2==0))|((coors[:,:,:,0]%2==1)&(coors[:,:,:,1]%2==1))# 
             
-            small_min,small_max=depth_sup_plus_small.min(1)[0],depth_sup_plus_small.max(1)[0]
-            huge_min,huge_max=depth_sup_plus_huge.min(1)[0],depth_sup_plus_huge.max(1)[0]
+            small_min, small_max = depth_sup_plus_small.min(1)[0], depth_sup_plus_small.max(1)[0]
+            huge_min, huge_max = depth_sup_plus_huge.min(1)[0], depth_sup_plus_huge.max(1)[0]
         
-            loss_m=Monte_Carlo_sampling_loss(torch.where(coor_mask,small_min,small_max),depth_gt,mask,torch.ones_like(depth_gt)*stage_weight,mode="center",regress_fn=regression_loss)+\
-                Monte_Carlo_sampling_loss(torch.where(~coor_mask,small_min,small_max),depth_gt,mask,torch.ones_like(depth_gt)*stage_weight,mode="center",regress_fn=regression_loss)+\
-                Monte_Carlo_sampling_loss(torch.where(coor_mask,huge_min,huge_max),depth_gt,mask,torch.ones_like(depth_gt)*stage_weight,mode="center",regress_fn=regression_loss)+\
-                Monte_Carlo_sampling_loss(torch.where(~coor_mask,huge_min,huge_max),depth_gt,mask,torch.ones_like(depth_gt)*stage_weight,mode="center",regress_fn=regression_loss)
+            loss_m = Monte_Carlo_sampling_loss(torch.where(coor_mask, small_min,small_max), depth_gt, mask,torch.ones_like(depth_gt)*stage_weight, mode="center", regress_fn=regression_loss)+\
+                Monte_Carlo_sampling_loss(torch.where(~coor_mask, small_min,small_max), depth_gt, mask,torch.ones_like(depth_gt)*stage_weight, mode="center", regress_fn=regression_loss)+\
+                Monte_Carlo_sampling_loss(torch.where(coor_mask, huge_min,huge_max), depth_gt, mask,torch.ones_like(depth_gt)*stage_weight, mode="center", regress_fn=regression_loss)+\
+                Monte_Carlo_sampling_loss(torch.where(~coor_mask, huge_min,huge_max), depth_gt, mask,torch.ones_like(depth_gt)*stage_weight, mode="center", regress_fn=regression_loss)
 
-
-            total_loss+=(loss_depth+loss_var_small+loss_var_huge+loss_m)
+            total_loss += (loss_depth + loss_var_small + loss_var_huge + loss_m)
 
         elif mode == "classification":
-            # loss = classification_loss(prob_volume, depth_values, interval, depth_gt, mask, stage_weight)
             loss = classification_loss_1(prob_volume, depth_values, interval, depth_gt, mask, stage_weight)
-
             total_loss += loss
+        
         elif mode =="gfocal":
             fl_gamas = [2, 1, 0]
             fl_alphas = [0.75, 0.5, 0.25]
@@ -89,6 +86,7 @@ def mvs_loss(inputs, depth_gt_ms, mask_ms, mode, **kwargs):
             alpha = fl_alphas[stage_idx]
             loss = gfocal_loss(prob_volume, depth_values, interval, depth_gt, mask, stage_weight, gamma, alpha)
             total_loss += loss
+        
         elif mode == "unification":
             fl_gamas = [2, 1, 0]
             fl_alphas = [0.75, 0.5, 0.25]
@@ -96,53 +94,55 @@ def mvs_loss(inputs, depth_gt_ms, mask_ms, mode, **kwargs):
             alpha = fl_alphas[stage_idx]
             loss = unified_focal_loss(prob_volume, depth_values, interval, depth_gt, mask, stage_weight, gamma, alpha)
             total_loss += loss
+        
         else:
             raise NotImplementedError("Only support regression, classification and unification!")
 
     return total_loss
 
-def Monte_Carlo_sampling_loss(depth_est, depth_gt, mask, weight,mode="center",reflect=False,regress_fn=None):
+def Monte_Carlo_sampling_loss(depth_est, depth_gt, mask, weight, mode="center", reflect=False, regress_fn=None):
     
-    batch,height, width= depth_gt.shape
+    batch,height, width = depth_gt.shape
 
     if mode=="center":
-        x_offset,y_offset=0.5*torch.ones((batch,height-1, width-1)),0.5*torch.ones((batch,height-1, width-1))
+        # fixed offset
+        x_offset, y_offset = 0.5*torch.ones((batch, height-1, width-1)), 0.5 * torch.ones((batch, height-1, width-1))
     else:
-        x_offset,y_offset=torch.rand(batch,height-1, width-1),torch.rand((batch,height-1, width-1))
-    
-    x_offset,y_offset=x_offset.to(depth_gt.device),y_offset.to(depth_gt.device)
+        # random offset
+        x_offset, y_offset = torch.rand(batch, height-1, width-1), torch.rand((batch, height-1, width-1))
+    # move to device
+    x_offset, y_offset = x_offset.to(depth_gt.device), y_offset.to(depth_gt.device)
 
     y, x = torch.meshgrid([torch.arange(0, height-1, dtype=torch.float32, device=depth_gt.device),
                         torch.arange(0, width-1, dtype=torch.float32, device=depth_gt.device)])
-    y, x = y.contiguous().unsqueeze(0).repeat(batch,1,1)+y_offset, x.contiguous().unsqueeze(0).repeat(batch,1,1)+x_offset
-    x=x/((width - 1) / 2) - 1
-    y=y/((height - 1) / 2) - 1
+    y, x = y.contiguous().unsqueeze(0).repeat(batch, 1, 1) + y_offset, x.contiguous().unsqueeze(0).repeat(batch, 1, 1) + x_offset
+    x = x / ((width - 1) / 2) - 1
+    y = y / ((height - 1) / 2) - 1
 
-    grid=torch.stack((x, y), dim=3)
+    grid = torch.stack((x, y), dim=3) # B H-1 W-1 2
 
-    sampled_gt=F.grid_sample(depth_gt.unsqueeze(1), grid, mode='bilinear',padding_mode='zeros',align_corners=True).type(torch.float32)
-    sampled_est=F.grid_sample(depth_est.unsqueeze(1), grid, mode='bilinear',padding_mode='zeros',align_corners=True).type(torch.float32)
-    sampled_weight=F.grid_sample(weight.unsqueeze(1), grid, mode='bilinear',padding_mode='zeros',align_corners=True).type(torch.float32)
-    sampled_mask=F.grid_sample(mask.float().unsqueeze(1), grid, mode='bilinear',padding_mode='zeros',align_corners=True).type(torch.float32)
-    #mask!=1 mean there is zero depth\
-    sampled_mask=sampled_mask>=1.
+    sampled_gt = F.grid_sample(depth_gt.unsqueeze(1), grid, mode='bilinear', padding_mode='zeros', align_corners=True).type(torch.float32) # B 1 H-1 W-1
+    sampled_est = F.grid_sample(depth_est.unsqueeze(1), grid, mode='bilinear', padding_mode='zeros', align_corners=True).type(torch.float32) # B 1 H-1 W-1
+    sampled_weight = F.grid_sample(weight.unsqueeze(1), grid, mode='bilinear', padding_mode='zeros', align_corners=True).type(torch.float32) # B 1 H-1 W-1
+    sampled_mask = F.grid_sample(mask.float().unsqueeze(1), grid, mode='bilinear', padding_mode='zeros', align_corners=True).type(torch.float32) # B 1 H-1 W-1
     
+    # mask!=1 mean there is zero depth
+    sampled_mask = sampled_mask>=1.
     
-    if reflect== False:
+    if reflect == False:
         # loss = F.smooth_l1_loss(sampled_est[sampled_mask], sampled_gt[sampled_mask], reduction='mean')
-        loss =regress_fn(sampled_est, sampled_gt, sampled_mask,sampled_weight)
+        loss = regress_fn(sampled_est, sampled_gt, sampled_mask, sampled_weight)
         
     else:
         with torch.no_grad():
-            err=depth_est-depth_gt   
+            err = depth_est-depth_gt   
             kernel = torch.ones((2,2)).unsqueeze(0).unsqueeze(0).to(depth_gt.device)
             kernel_weight = torch.nn.Parameter(data=kernel, requires_grad=False)
             
-            up_sum=F.conv2d((err.unsqueeze(1)>0).float(),kernel_weight)
-            dn_sum=F.conv2d((err.unsqueeze(1)<0).float(),kernel_weight)
+            up_sum = F.conv2d((err.unsqueeze(1)>0).float(),kernel_weight)
+            dn_sum = F.conv2d((err.unsqueeze(1)<0).float(),kernel_weight)
             
-            reflect_weight=torch.where((up_sum==4.)|(dn_sum==4.),2*torch.ones_like(sampled_gt),torch.ones_like(sampled_gt))
-            # reflect_weight=reflect_weight[sampled_mask]
+            reflect_weight = torch.where((up_sum==4.)|(dn_sum==4.), 2 * torch.ones_like(sampled_gt), torch.ones_like(sampled_gt))
 
         loss = F.smooth_l1_loss((reflect_weight*sampled_est)[sampled_mask], (reflect_weight*sampled_gt)[sampled_mask], reduction='mean')
     
